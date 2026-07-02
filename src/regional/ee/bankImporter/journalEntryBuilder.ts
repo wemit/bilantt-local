@@ -116,6 +116,8 @@ async function createBankEntry(
     archivalId: row.archivalId,
     importBank,
     vatCode: row.proposedVatCode ?? '',
+    counterparty: row.counterpartyName ?? '',
+    importAccount: row.proposedAccount,
   });
 
   await doc.sync();

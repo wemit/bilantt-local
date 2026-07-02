@@ -30,6 +30,20 @@
       "section": "References"
     },
     {
+      "fieldname": "counterparty",
+      "label": "Counterparty",
+      "fieldtype": "Data",
+      "readOnly": true,
+      "section": "References"
+    },
+    {
+      "fieldname": "importAccount",
+      "label": "Import Account",
+      "fieldtype": "Data",
+      "readOnly": true,
+      "section": "References"
+    },
+    {
       "fieldname": "euPartnerVat",
       "label": "EU Partner VAT",
       "fieldtype": "Data",

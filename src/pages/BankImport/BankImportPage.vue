@@ -76,7 +76,7 @@
         <p class="mb-2">{{ emptyStateDescription }}</p>
         <p class="mb-2">
           {{
-            t`Rows are matched against built-in rules (AWS, GitHub, Stripe, Apple/Google payouts, LHV fees). You can override the proposed account and VAT code before committing.`
+            t`Rows are matched first against your saved vendors/customers (Party default account + VAT status), then built-in rules. You can override the proposed account and VAT code before committing.`
           }}
         </p>
         <p>
@@ -213,6 +213,8 @@ import {
   classifyRows,
   buildJournalEntries,
   ClassifiedRow,
+  PartyClassification,
+  HistoryEntry,
   EeBank,
   EE_BANKS,
 } from 'src/regional/ee/bankImporter';
@@ -237,6 +239,8 @@ export default defineComponent({
       commitResult: null as BuildResult | null,
       accountOptions: [] as string[],
       bankAccountOptions: [] as string[],
+      parties: [] as PartyClassification[],
+      history: [] as HistoryEntry[],
       EE_BANKS,
     };
   },
@@ -255,6 +259,36 @@ export default defineComponent({
     if (this.bankAccountOptions.length > 0) {
       this.selectedBankAccount = this.bankAccountOptions[0];
     }
+
+    this.parties = (await fyo.db.getAll('Party', {
+      fields: [
+        'name',
+        'role',
+        'defaultAccount',
+        'partyVatType',
+        'vatNumber',
+        'iban',
+      ],
+    })) as PartyClassification[];
+
+    const pastEntries = (await fyo.db.getAll(ModelNameEnum.JournalEntry, {
+      fields: ['counterparty', 'importAccount', 'vatCode'],
+      filters: { entryType: 'Bank Entry', cancelled: false },
+      orderBy: 'created',
+      order: 'desc',
+    })) as {
+      counterparty?: string;
+      importAccount?: string;
+      vatCode?: string;
+    }[];
+
+    this.history = pastEntries
+      .filter((e) => e.counterparty && e.importAccount)
+      .map((e) => ({
+        counterparty: e.counterparty!,
+        account: e.importAccount!,
+        vatCode: (e.vatCode || null) as VatCodeName | null,
+      }));
   },
   computed: {
     selectedBank(): EeBank | undefined {
@@ -308,7 +342,10 @@ export default defineComponent({
           parsed = csvParser(text);
         }
 
-        this.rows = classifyRows(parsed);
+        this.rows = classifyRows(parsed, {
+          parties: this.parties,
+          history: this.history,
+        });
         if (this.rows.length === 0) {
           this.parseError = this.t`No rows found in file.`;
         } else {

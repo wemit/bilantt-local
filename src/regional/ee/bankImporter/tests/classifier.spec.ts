@@ -60,3 +60,32 @@ test('classifier: classifyRows preserves row count', (t) => {
   t.equal(classifyRows(rows).length, 3);
   t.end();
 });
+
+test('classifier: Party match takes precedence over built-in rules', (t) => {
+  // AWS would match the built-in aws-eu rule, but a Party override wins.
+  const r = classifyRow(
+    row({ counterpartyName: 'Amazon Web Services EMEA SARL', amount: -150 }),
+    {
+      parties: [
+        {
+          name: 'Amazon Web Services',
+          defaultAccount: '4310 - Telephone and Internet',
+          partyVatType: 'EU_B2B',
+        },
+      ],
+    }
+  );
+  t.equal(r.proposedAccount, '4310 - Telephone and Internet');
+  t.equal(r.proposedVatCode, 'EU_RC_SERVICES');
+  t.equal(r.matchedRuleId, 'party:Amazon Web Services');
+  t.end();
+});
+
+test('classifier: unmatched Party falls back to built-in rules', (t) => {
+  const r = classifyRow(
+    row({ counterpartyName: 'Amazon Web Services EMEA SARL', amount: -150 }),
+    { parties: [{ name: 'Unrelated', defaultAccount: '4320 - IT Services' }] }
+  );
+  t.equal(r.matchedRuleId, 'aws-eu');
+  t.end();
+});

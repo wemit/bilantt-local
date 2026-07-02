@@ -1,17 +1,53 @@
 import { ClassifiedRow, ClassifierRule, BankRow } from './types';
 import { DEFAULT_RULES } from './rules';
+import { PartyClassification, resolveFromParties } from './partyResolver';
+import { HistoryEntry, resolveFromHistory } from './historyResolver';
+
+export interface ClassifyOptions {
+  rules?: ClassifierRule[];
+  parties?: PartyClassification[];
+  history?: HistoryEntry[];
+}
 
 export function classifyRows(
   rows: BankRow[],
-  rules: ClassifierRule[] = DEFAULT_RULES
+  opts: ClassifyOptions = {}
 ): ClassifiedRow[] {
-  return rows.map((row) => classifyRow(row, rules));
+  return rows.map((row) => classifyRow(row, opts));
 }
 
 export function classifyRow(
   row: BankRow,
-  rules: ClassifierRule[] = DEFAULT_RULES
+  opts: ClassifyOptions = {}
 ): ClassifiedRow {
+  const { rules = DEFAULT_RULES, parties, history } = opts;
+
+  if (parties && parties.length > 0) {
+    const match = resolveFromParties(row, parties);
+    if (match) {
+      return {
+        ...row,
+        proposedVatCode: match.vatCode,
+        proposedAccount: match.account,
+        side: match.side,
+        matchedRuleId: `party:${match.partyName}`,
+      };
+    }
+  }
+
+  if (history && history.length > 0) {
+    const match = resolveFromHistory(row, history);
+    if (match) {
+      return {
+        ...row,
+        proposedVatCode: match.vatCode,
+        proposedAccount: match.account,
+        side: match.side,
+        matchedRuleId: 'history',
+      };
+    }
+  }
+
   for (const rule of rules) {
     if (matches(row, rule)) {
       return {
@@ -23,6 +59,7 @@ export function classifyRow(
       };
     }
   }
+
   return {
     ...row,
     proposedVatCode: null,

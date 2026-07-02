@@ -41,6 +41,13 @@
       "fieldtype": "Data",
       "placeholder": "EE123456789",
       "section": "Billing"
+    },
+    {
+      "fieldname": "iban",
+      "label": "IBAN",
+      "fieldtype": "Data",
+      "placeholder": "EE987700771012989707",
+      "section": "Billing"
     }
   ],
   "quickEditFields": [
@@ -51,7 +58,8 @@
     "currency",
     "role",
     "partyVatType",
-    "vatNumber"
+    "vatNumber",
+    "iban"
   ],
   "removeFields": ["taxId"]
 }

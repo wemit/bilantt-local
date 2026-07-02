@@ -26,23 +26,7 @@ function getCurrencyList(): { countryCode: string; name: string }[] {
 export function getCOAList() {
   return [
     { name: t`Standard Chart of Accounts`, countryCode: '' },
-
-    { countryCode: 'ae', name: 'U.A.E - Chart of Accounts' },
-    // EE: Estonian CoA (native regional pattern)
     { countryCode: 'ee', name: 'Estonia - Chart of Accounts' },
-    {
-      countryCode: 'ca',
-      name: 'Canada - Plan comptable pour les provinces francophones',
-    },
-    { countryCode: 'gt', name: 'Guatemala - Cuentas' },
-    { countryCode: 'hu', name: 'Hungary - Chart of Accounts' },
-    { countryCode: 'id', name: 'Indonesia - Chart of Accounts' },
-    { countryCode: 'in', name: 'India - Chart of Accounts' },
-    { countryCode: 'mx', name: 'Mexico - Plan de Cuentas' },
-    { countryCode: 'ni', name: 'Nicaragua - Catalogo de Cuentas' },
-    { countryCode: 'nl', name: 'Netherlands - Grootboekschema' },
-    { countryCode: 'sg', name: 'Singapore - Chart of Accounts' },
-    { countryCode: 'fr', name: 'France - Plan Comptable General' },
   ];
 }
 
