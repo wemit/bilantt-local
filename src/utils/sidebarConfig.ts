@@ -140,6 +140,17 @@ function getReportSidebar() {
         name: 'trial-balance',
         route: '/report/TrialBalance',
       },
+      // CUSTOM: aging addon reports
+      {
+        label: t`Aged Receivables`,
+        name: 'aged-receivables',
+        route: '/report/AgedReceivables',
+      },
+      {
+        label: t`Aged Payables`,
+        name: 'aged-payables',
+        route: '/report/AgedPayables',
+      },
     ],
   };
 }

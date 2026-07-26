@@ -4,9 +4,10 @@ import type { Fyo } from 'fyo';
 import type { RouteRecordRaw } from 'vue-router';
 import type { SidebarRoot } from 'src/utils/types';
 import type { AddonListAction, AppAddon, ReportClass } from './types';
+import aging from './aging';
 import ee from './ee';
 
-export const addons: AppAddon[] = [ee];
+export const addons: AppAddon[] = [ee, aging];
 
 function enabled(fyo: Fyo): AppAddon[] {
   return addons.filter((a) => !a.condition || a.condition(fyo));
