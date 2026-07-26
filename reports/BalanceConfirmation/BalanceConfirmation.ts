@@ -6,8 +6,6 @@ import getCommonExportActions from 'reports/commonExporter';
 import { Report } from 'reports/Report';
 import { ColumnField, ReportRow } from 'reports/types';
 import { Field } from 'schemas/types';
-import { getPathAndMakePDF } from 'src/utils/printTemplates';
-import { paperSizeMap } from 'src/utils/ui';
 import { QueryFilter } from 'utils/db/types';
 import {
   BalanceAccountType,
@@ -17,6 +15,8 @@ import {
   round2,
   toNumber,
 } from './letterHtml';
+
+const A4 = { width: 21, height: 29.7 };
 
 type RoleFilter = 'All' | 'Customer' | 'Supplier';
 
@@ -330,7 +330,8 @@ export class BalanceConfirmation extends Report {
     });
 
     const innerHTML = getConfirmationDocumentHtml(letters);
-    const { width, height } = paperSizeMap.A4;
+    const { width, height } = A4;
+    const { getPathAndMakePDF } = await import('src/utils/printTemplates');
     await getPathAndMakePDF(
       `BalanceConfirmation-${this.asOfDate!}`,
       innerHTML,

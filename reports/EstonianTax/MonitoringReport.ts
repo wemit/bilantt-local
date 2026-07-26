@@ -240,7 +240,6 @@ export class KmdMonitoringReport extends Report {
   }
 
   getActions(): Action[] {
-    // commonExporter pulls Vue UI modules; deferred so tape can import this file
     return (['CSV', 'JSON'] as const).map((label) => ({
       group: t`Export`,
       label,

@@ -15,7 +15,6 @@ import {
 import { exportKmdXml } from './KmdXmlExporter';
 import { exportVdXml } from './VdXmlExporter';
 import { KmdBodyTotals, KmdReportData, VdLine, VdReportData } from './types';
-import { showToast } from 'src/utils/interactive';
 import { getSavePath } from 'src/utils/ui';
 
 export class KmdReport extends Report {
@@ -650,10 +649,10 @@ export class KmdReport extends Report {
     if (canceled || !filePath) return;
 
     await ipc.saveData(xml, filePath);
-    this.suggestLockDate();
+    await this.suggestLockDate();
   }
 
-  private suggestLockDate() {
+  private async suggestLockDate() {
     if (!this.data) return;
 
     const periodEnd = DateTime.local(this.data.year, this.data.month)
@@ -668,6 +667,7 @@ export class KmdReport extends Report {
       : null;
     if (lockIso && lockIso >= periodEnd) return;
 
+    const { showToast } = await import('src/utils/interactive');
     showToast({
       type: 'info',
       message: t`KMD exported. Set Lock Date in Accounting Settings to close the period.`,
