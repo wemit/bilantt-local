@@ -3,14 +3,6 @@
     <PageHeader :title="t`EE Bank Statement Import`">
       <template v-if="rows.length === 0 && commitResult === null">
         <select
-          v-model="selectedBankId"
-          class="border border-gray-300 rounded px-2 py-1 text-sm"
-        >
-          <option v-for="bank in EE_BANKS" :key="bank.id" :value="bank.id">
-            {{ bank.label }}
-          </option>
-        </select>
-        <select
           v-model="selectedBankAccount"
           class="border border-gray-300 rounded px-2 py-1 text-sm"
         >
@@ -20,7 +12,7 @@
         </select>
       </template>
       <span v-else class="text-sm text-gray-500">
-        {{ selectedBank?.label }} · {{ selectedBankAccount }}
+        {{ selectedBankAccount }}
       </span>
 
       <Button v-if="rows.length > 0" :title="t`Clear`" @click="clear">
@@ -73,7 +65,11 @@
         v-if="rows.length === 0 && commitResult === null"
         class="text-base text-gray-600 max-w-2xl"
       >
-        <p class="mb-2">{{ emptyStateDescription }}</p>
+        <p class="mb-2">
+          {{
+            t`Import a CAMT.053.001.02 XML statement (any Estonian bank) or an LHV CSV export. The bank is detected from the statement itself.`
+          }}
+        </p>
         <p class="mb-2">
           {{
             t`Rows are matched first against your saved vendors/customers (Party default account + VAT status), then built-in rules. You can override the proposed account and VAT code before committing.`
@@ -212,26 +208,19 @@ import {
   parseCamt,
   classifyRows,
   buildJournalEntries,
+  detectImportBank,
   ClassifiedRow,
   PartyClassification,
   HistoryEntry,
-  EeBank,
-  EE_BANKS,
 } from 'src/regional/ee/bankImporter';
 import type { BuildResult } from 'src/regional/ee/bankImporter/journalEntryBuilder';
-
-const CSV_PARSERS: Partial<
-  Record<string, (text: string) => ReturnType<typeof parseLhvCsv>>
-> = {
-  lhv: parseLhvCsv,
-};
 
 export default defineComponent({
   components: { Button, PageHeader },
   data() {
     return {
-      selectedBankId: 'lhv' as string,
       selectedBankAccount: '' as string,
+      detectedImportBank: '' as string,
       rows: [] as ClassifiedRow[],
       parseError: '' as string,
       isCommitting: false,
@@ -241,8 +230,15 @@ export default defineComponent({
       bankAccountOptions: [] as string[],
       parties: [] as PartyClassification[],
       history: [] as HistoryEntry[],
-      EE_BANKS,
     };
+  },
+  computed: {
+    vatCodeOptions(): VatCodeName[] {
+      return Object.keys(VAT_CODES) as VatCodeName[];
+    },
+    nonDuplicateCount(): number {
+      return this.rows.filter((r) => !r.isDuplicate).length;
+    },
   },
   async mounted() {
     const all = (await fyo.db.getAll('Account', {
@@ -290,37 +286,13 @@ export default defineComponent({
         vatCode: (e.vatCode || null) as VatCodeName | null,
       }));
   },
-  computed: {
-    selectedBank(): EeBank | undefined {
-      return EE_BANKS.find((b) => b.id === this.selectedBankId);
-    },
-    vatCodeOptions(): VatCodeName[] {
-      return Object.keys(VAT_CODES) as VatCodeName[];
-    },
-    nonDuplicateCount(): number {
-      return this.rows.filter((r) => !r.isDuplicate).length;
-    },
-    emptyStateDescription(): string {
-      const bank = this.selectedBank;
-      if (!bank)
-        return this.t`Select a bank and import a CAMT.053 XML statement.`;
-      if (bank.csvSupported) {
-        return this
-          .t`Import a ${bank.label} CSV or CAMT.053.001.02 XML statement.`;
-      }
-      return this
-        .t`Import a CAMT.053.001.02 XML statement exported from ${bank.label}. CSV is not yet supported for this bank.`;
-    },
-  },
   methods: {
     async selectFile() {
       this.parseError = '';
-      const bank = this.selectedBank;
-      const extensions = bank?.csvSupported ? ['csv', 'xml'] : ['xml'];
 
       const res = await ipc.selectFile({
         title: this.t`Select bank statement file`,
-        filters: [{ name: 'Bank statement', extensions }],
+        filters: [{ name: 'Bank statement', extensions: ['csv', 'xml'] }],
       });
       if (res.canceled || !res.success || !res.filePath || !res.data) return;
 
@@ -332,16 +304,18 @@ export default defineComponent({
         if (ext === 'xml') {
           parsed = parseCamt(text);
         } else {
-          const csvParser = CSV_PARSERS[this.selectedBankId];
-          if (!csvParser) {
-            this.parseError = this.t`CSV import is not yet supported for ${
-              bank?.label ?? this.selectedBankId
-            }. Export a CAMT.053 XML statement instead.`;
+          try {
+            parsed = parseLhvCsv(text);
+          } catch {
+            this.parseError = this
+              .t`Could not parse CSV. CSV import supports LHV exports; for other banks use a CAMT.053 XML statement.`;
             return;
           }
-          parsed = csvParser(text);
         }
 
+        this.detectedImportBank = detectImportBank(
+          parsed[0]?.accountIban ?? ''
+        );
         this.rows = classifyRows(parsed, {
           parties: this.parties,
           history: this.history,
@@ -360,7 +334,7 @@ export default defineComponent({
         const existing = (await fyo.db.getAll(ModelNameEnum.JournalEntry, {
           fields: ['name'],
           filters: {
-            importBank: this.selectedBankId,
+            importBank: this.detectedImportBank,
             archivalId: row.archivalId,
             cancelled: false,
           },
@@ -376,7 +350,7 @@ export default defineComponent({
           this.rows,
           fyo,
           this.selectedBankAccount,
-          this.selectedBankId,
+          this.detectedImportBank,
           { autoSubmit: this.autoSubmit }
         );
       } catch (err) {

@@ -37,16 +37,16 @@ export interface ClassifierRule {
   side: ClassifiedSide;
 }
 
-export interface EeBank {
-  id: string;
-  label: string;
-  csvSupported: boolean;
-}
+const EE_IBAN_BANK_CODES: Record<string, string> = {
+  '77': 'lhv',
+  '10': 'seb',
+  '22': 'swedbank',
+  '96': 'luminor',
+  '42': 'coop',
+};
 
-export const EE_BANKS: EeBank[] = [
-  { id: 'lhv', label: 'LHV', csvSupported: true },
-  { id: 'seb', label: 'SEB', csvSupported: false },
-  { id: 'swedbank', label: 'Swedbank', csvSupported: false },
-  { id: 'luminor', label: 'Luminor', csvSupported: false },
-  { id: 'coop', label: 'Coop Pank', csvSupported: false },
-];
+export function detectImportBank(accountIban: string): string {
+  const iban = accountIban.replace(/\s/g, '').toUpperCase();
+  if (!iban.startsWith('EE')) return 'unknown';
+  return EE_IBAN_BANK_CODES[iban.slice(4, 6)] ?? 'unknown';
+}

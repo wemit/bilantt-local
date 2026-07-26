@@ -16,7 +16,6 @@ export type {
   ClassifiedRow,
   ClassifiedSide,
   ClassifierRule,
-  EeBank,
 } from './types';
-export { EE_BANKS } from './types';
+export { detectImportBank } from './types';
 export { DEFAULT_RULES } from './rules';
