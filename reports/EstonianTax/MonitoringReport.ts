@@ -170,6 +170,7 @@ function num(value: unknown): number {
 export class KmdMonitoringReport extends Report {
   static title = t`KMD Monitoring`;
   static reportName = 'KmdMonitoringReport';
+  static description = t`Drill-down behind the KMD declaration: every journal entry and invoice line that feeds a KMD line, grouped with subtotals, so each declared figure can be traced back to its source documents before filing.`;
 
   year?: number;
   month?: number;
@@ -239,8 +240,7 @@ export class KmdMonitoringReport extends Report {
   }
 
   getActions(): Action[] {
-    // commonExporter transitively imports Vue UI modules; deferring keeps this
-    // module importable in node-side tests
+    // commonExporter pulls Vue UI modules; deferred so tape can import this file
     return (['CSV', 'JSON'] as const).map((label) => ({
       group: t`Export`,
       label,
@@ -316,8 +316,7 @@ export class KmdMonitoringReport extends Report {
         continue;
       }
 
-      // -RC JEs post self-assessed VAT only; the net base is monitored on the
-      // source document (see KmdReport RC handling)
+      // -RC JEs carry only self-assessed VAT; net base sits on the source doc
       if ((je.archivalId ?? '').endsWith('-RC')) {
         continue;
       }

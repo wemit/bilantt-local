@@ -72,8 +72,7 @@ export function buildAgingGroups(
       party: inv.party,
       invoice: inv.name,
       date: inv.date,
-      // outstanding is current-state, so invoices dated after asOfDate stay
-      // in the report with age 0 rather than being dropped
+      // outstanding is current-state; invoices dated after asOfDate stay at age 0
       ageDays: Math.max(0, ageDays),
       outstanding,
       buckets,

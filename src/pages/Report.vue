@@ -21,6 +21,14 @@
       </Button>
     </PageHeader>
 
+    <!-- CUSTOM: optional report description line -->
+    <p
+      v-if="description"
+      class="px-4 pt-4 text-sm text-gray-600 dark:text-gray-400 max-w-3xl"
+    >
+      {{ description }}
+    </p>
+
     <!-- Filters -->
     <div
       v-if="report && report.filters.length"
@@ -97,6 +105,13 @@ export default defineComponent({
   computed: {
     title() {
       return reports[this.reportClassName]?.title ?? t`Report`;
+    },
+    // CUSTOM: optional report description line
+    description() {
+      return (
+        (reports[this.reportClassName] as { description?: string })
+          ?.description ?? ''
+      );
     },
     groupedActions() {
       const actions = this.report?.getActions() ?? [];

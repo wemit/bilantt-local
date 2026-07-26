@@ -38,6 +38,7 @@ interface OpenInvoice {
 export class BalanceConfirmation extends Report {
   static title = t`Balance Confirmations`;
   static reportName = 'BalanceConfirmation';
+  static description = t`Balance confirmation (saldokinnitus): receivable and payable balances per partner at a chosen date, used for the year-end inventory of balances. Export prints one confirmation letter per partner as a single PDF to send out for sign-off.`;
   static isInventory = false;
 
   loading = false;
@@ -141,8 +142,7 @@ export class BalanceConfirmation extends Report {
     }
   }
 
-  // Ledger dates are Datetime strings; an exclusive next-day bound keeps the
-  // whole as-of day in string comparison.
+  // Datetime strings: exclusive next-day bound keeps the whole as-of day
   private get endDateExclusive(): string {
     return DateTime.fromISO(this.asOfDate!).plus({ days: 1 }).toISODate()!;
   }
