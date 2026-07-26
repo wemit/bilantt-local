@@ -137,7 +137,13 @@ export async function getRegionalModels(
   // EE: Estonian regional models (native regional pattern)
   if (countryCode === 'ee') {
     const { Party } = await import('./regionalModels/ee/Party');
-    return { Party };
+    const { JournalEntry } = await import('./regionalModels/ee/JournalEntry');
+    const { SalesInvoice } = await import('./regionalModels/ee/SalesInvoice');
+    const { PurchaseInvoice } = await import(
+      './regionalModels/ee/PurchaseInvoice'
+    );
+    const { Payment } = await import('./regionalModels/ee/Payment');
+    return { Party, JournalEntry, SalesInvoice, PurchaseInvoice, Payment };
   }
 
   return {};

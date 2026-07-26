@@ -21,6 +21,13 @@
       "fieldtype": "Data",
       "placeholder": "/Users/you/.local/bin/arelleCmdLine",
       "section": "Default"
+    },
+    {
+      "fieldname": "lockDate",
+      "label": "Lock Date",
+      "fieldtype": "Date",
+      "description": "Documents dated on or before this date cannot be changed",
+      "section": "Default"
     }
   ],
   "quickEditFields": [
@@ -33,6 +40,7 @@
     "fiscalYearEnd",
     "vatNumber",
     "registryCode",
-    "arellePath"
+    "arellePath",
+    "lockDate"
   ]
 }
