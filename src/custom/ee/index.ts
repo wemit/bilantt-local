@@ -3,7 +3,9 @@ import { t } from 'fyo';
 import type { Fyo } from 'fyo';
 import { ModelNameEnum } from 'models/types';
 import { AnnualReport } from 'reports/EstonianAnnualReport/AnnualReport';
+import { BalanceConfirmation } from 'reports/BalanceConfirmation/BalanceConfirmation';
 import { KmdReport } from 'reports/EstonianTax/KmdReport';
+import { KmdMonitoringReport } from 'reports/EstonianTax/MonitoringReport';
 import { showDialog, showToast } from 'src/utils/interactive';
 import type { SidebarRoot } from 'src/utils/types';
 import type { AppAddon } from '../types';
@@ -25,9 +27,19 @@ function getEstoniaSidebar(_fyo: Fyo): SidebarRoot[] {
         },
         { label: t`KMD`, name: 'kmd', route: '/report/KmdReport' },
         {
+          label: t`KMD Monitoring`,
+          name: 'kmd-monitoring',
+          route: '/report/KmdMonitoringReport',
+        },
+        {
           label: t`Annual Report`,
           name: 'annual-report',
           route: '/report/AnnualReport',
+        },
+        {
+          label: t`Balance Confirmations`,
+          name: 'balance-confirmations',
+          route: '/report/BalanceConfirmation',
         },
       ],
     },
@@ -89,7 +101,12 @@ async function runSubmitDrafts(fyo: Fyo, drafts: { name: string }[]) {
 const ee: AppAddon = {
   name: 'ee',
   condition: (fyo) => fyo.singles?.SystemSettings?.countryCode === 'ee',
-  reports: { KmdReport, AnnualReport },
+  reports: {
+    KmdReport,
+    KmdMonitoringReport,
+    AnnualReport,
+    BalanceConfirmation,
+  },
   routes: [
     {
       path: '/regional/ee/bank-import',
