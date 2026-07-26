@@ -7,9 +7,15 @@ import { Report } from 'reports/Report';
 import { ColumnField, ReportData, ReportRow } from 'reports/types';
 import { Field } from 'schemas/types';
 import { emptyKmdBody, pickVersion, VAT_CODE_TO_BUCKET } from './lineMap';
+import {
+  buildPurchaseAnnex,
+  buildSaleAnnex,
+  InfInvoiceInput,
+} from './infAggregator';
 import { exportKmdXml } from './KmdXmlExporter';
 import { exportVdXml } from './VdXmlExporter';
 import { KmdBodyTotals, KmdReportData, VdLine, VdReportData } from './types';
+import { showToast } from 'src/utils/interactive';
 import { getSavePath } from 'src/utils/ui';
 
 export class KmdReport extends Report {
@@ -207,6 +213,21 @@ export class KmdReport extends Report {
       }
     }
 
+    const partyInfo = await this.getPartyInfo();
+    const saleInputs = await this.aggregateSalesInvoices(
+      body,
+      vdAccum,
+      partyInfo,
+      from,
+      to
+    );
+    const purchaseInputs = await this.aggregatePurchaseInvoices(
+      body,
+      partyInfo,
+      from,
+      to
+    );
+
     const vdLines: VdLine[] = [];
     for (const [partnerVat, acc] of vdAccum) {
       const { country, number } = splitVatNumber(partnerVat);
@@ -227,11 +248,188 @@ export class KmdReport extends Report {
         version: pickVersion(year, month),
         declarationType: 1,
         body: round2Body(body),
-        saleAnnex: [],
-        purchaseAnnex: [],
+        saleAnnex: buildSaleAnnex(saleInputs),
+        purchaseAnnex: buildPurchaseAnnex(purchaseInputs),
       },
       vd: { taxPayerRegCode, year, month, lines: vdLines },
     };
+  }
+
+  private async getPartyInfo(): Promise<PartyInfoMap> {
+    const parties = (await this.fyo.db.getAllRaw(ModelNameEnum.Party, {
+      fields: ['name', 'vatNumber', 'registryCode'],
+    })) as Array<{
+      name: string;
+      vatNumber?: string;
+      registryCode?: string;
+    }>;
+    return new Map(parties.map((p) => [p.name, p]));
+  }
+
+  private async fetchInvoiceRows(
+    schemaName: ModelNameEnum.SalesInvoice | ModelNameEnum.PurchaseInvoice,
+    from: DateTime,
+    to: DateTime
+  ): Promise<RawInvoiceRow[]> {
+    // Invoice date is a Datetime; a half-open range keeps last-day invoices in.
+    return (await this.fyo.db.getAllRaw(schemaName, {
+      fields: [
+        'name',
+        'date',
+        'party',
+        'netTotal',
+        'grandTotal',
+        'returnAgainst',
+      ],
+      filters: {
+        submitted: true,
+        cancelled: false,
+        date: ['>=', from.toISODate()!, '<', to.plus({ days: 1 }).toISODate()!],
+      },
+    })) as RawInvoiceRow[];
+  }
+
+  private async aggregateSalesInvoices(
+    body: KmdBodyTotals,
+    vdAccum: VdAccumMap,
+    partyInfo: PartyInfoMap,
+    from: DateTime,
+    to: DateTime
+  ): Promise<InfInvoiceInput[]> {
+    const rows = await this.fetchInvoiceRows(
+      ModelNameEnum.SalesInvoice,
+      from,
+      to
+    );
+
+    const inputs: InfInvoiceInput[] = [];
+    for (const inv of rows) {
+      const items = (await this.fyo.db.getAllRaw(
+        ModelNameEnum.SalesInvoiceItem,
+        {
+          fields: ['tax', 'amount'],
+          filters: { parent: inv.name },
+        }
+      )) as Array<{ tax?: string; amount?: string }>;
+
+      const portions = new Map<number, number>();
+      let hasZeroRated = false;
+
+      for (const item of items) {
+        const code = item.tax as VatCodeName | undefined;
+        if (!code || !(code in VAT_CODE_TO_BUCKET)) continue;
+        const bucket = VAT_CODE_TO_BUCKET[code];
+        if (!bucket || bucket.side !== 'sales') continue;
+
+        const net = num(item.amount);
+        if (bucket.primary) {
+          body[bucket.primary] = round2(body[bucket.primary] + net);
+        }
+        for (const extra of bucket.also ?? []) {
+          body[extra] = round2(body[extra] + net);
+        }
+
+        if (bucket.rate > 0) {
+          portions.set(bucket.rate, (portions.get(bucket.rate) ?? 0) + net);
+        } else {
+          hasZeroRated = true;
+        }
+
+        if (bucket.vdColumn) {
+          const partnerVat = (partyInfo.get(inv.party)?.vatNumber ?? '').trim();
+          if (partnerVat) {
+            const acc = vdAccum.get(partnerVat) ?? {
+              goods: 0,
+              services: 0,
+              triangle: 0,
+            };
+            acc[bucket.vdColumn] = round2(acc[bucket.vdColumn] + net);
+            vdAccum.set(partnerVat, acc);
+          }
+        }
+      }
+
+      inputs.push({
+        invoiceNumber: inv.name,
+        invoiceDate: String(inv.date).slice(0, 10),
+        partyName: inv.party,
+        registryCode: partyInfo.get(inv.party)?.registryCode || undefined,
+        isCreditNote: !!inv.returnAgainst,
+        netTotal: num(inv.netTotal),
+        grandTotal: num(inv.grandTotal),
+        ratePortions: [...portions].map(([rate, net]) => ({ rate, net })),
+        hasZeroRated,
+        vatTotal: 0,
+      });
+    }
+
+    return inputs;
+  }
+
+  private async aggregatePurchaseInvoices(
+    body: KmdBodyTotals,
+    partyInfo: PartyInfoMap,
+    from: DateTime,
+    to: DateTime
+  ): Promise<InfInvoiceInput[]> {
+    const rows = await this.fetchInvoiceRows(
+      ModelNameEnum.PurchaseInvoice,
+      from,
+      to
+    );
+
+    const inputs: InfInvoiceInput[] = [];
+    for (const inv of rows) {
+      const items = (await this.fyo.db.getAllRaw(
+        ModelNameEnum.PurchaseInvoiceItem,
+        {
+          fields: ['tax', 'amount'],
+          filters: { parent: inv.name },
+        }
+      )) as Array<{ tax?: string; amount?: string }>;
+
+      let vatTotal = 0;
+      for (const item of items) {
+        const code = item.tax as VatCodeName | undefined;
+        if (!code || !(code in VAT_CODE_TO_BUCKET)) continue;
+        const bucket = VAT_CODE_TO_BUCKET[code];
+        if (!bucket) continue;
+
+        const net = num(item.amount);
+        if (bucket.side === 'rc-purchase') {
+          if (bucket.primary) {
+            body[bucket.primary] = round2(body[bucket.primary] + net);
+          }
+          for (const extra of bucket.also ?? []) {
+            body[extra] = round2(body[extra] + net);
+          }
+          // KMS § 3 lg 4: self-assessed RC VAT is both payable and deductible.
+          const vat = round2((net * bucket.rate) / 100);
+          body.inputVatTotal = round2(body.inputVatTotal + vat);
+          body.rcVatPayable = round2(body.rcVatPayable + vat);
+        } else if (bucket.side === 'sales' && bucket.rate > 0) {
+          // EE24/13/9 on a purchase invoice = domestic input VAT (KMD line 5).
+          const vat = (net * bucket.rate) / 100;
+          body.inputVatTotal = round2(body.inputVatTotal + vat);
+          vatTotal += vat;
+        }
+      }
+
+      inputs.push({
+        invoiceNumber: inv.name,
+        invoiceDate: String(inv.date).slice(0, 10),
+        partyName: inv.party,
+        registryCode: partyInfo.get(inv.party)?.registryCode || undefined,
+        isCreditNote: !!inv.returnAgainst,
+        netTotal: num(inv.netTotal),
+        grandTotal: num(inv.grandTotal),
+        ratePortions: [],
+        hasZeroRated: false,
+        vatTotal: round2(vatTotal),
+      });
+    }
+
+    return inputs;
   }
 
   private toReportRows(body: KmdBodyTotals): ReportData {
@@ -452,6 +650,28 @@ export class KmdReport extends Report {
     if (canceled || !filePath) return;
 
     await ipc.saveData(xml, filePath);
+    this.suggestLockDate();
+  }
+
+  private suggestLockDate() {
+    if (!this.data) return;
+
+    const periodEnd = DateTime.local(this.data.year, this.data.month)
+      .endOf('month')
+      .toISODate();
+    const lockDate = this.fyo.singles.AccountingSettings?.lockDate as
+      | string
+      | Date
+      | undefined;
+    const lockIso = lockDate
+      ? DateTime.fromJSDate(new Date(lockDate)).toISODate()
+      : null;
+    if (lockIso && lockIso >= periodEnd) return;
+
+    showToast({
+      type: 'info',
+      message: t`KMD exported. Set Lock Date in Accounting Settings to close the period.`,
+    });
   }
 
   private async exportVdXml() {
@@ -483,6 +703,22 @@ export class KmdReport extends Report {
     await ipc.saveData(xml, filePath);
   }
 }
+
+type VdAccumMap = Map<
+  string,
+  { goods: number; services: number; triangle: number }
+>;
+
+type PartyInfoMap = Map<string, { vatNumber?: string; registryCode?: string }>;
+
+type RawInvoiceRow = {
+  name: string;
+  date: string;
+  party: string;
+  netTotal?: string;
+  grandTotal?: string;
+  returnAgainst?: string | null;
+};
 
 function splitVatNumber(vat: string): { country: string; number: string } {
   const m = /^([A-Za-z]{2})(.+)$/.exec(vat);

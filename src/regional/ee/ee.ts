@@ -33,13 +33,18 @@ function getTaxAccounts(code: VatCodeName): TaxAccountMap | null {
         reverseChargePayable: '2314 - RC VAT Payable',
         reverseChargeReceivable: '2314 - RC VAT Receivable',
       };
+    // Rate-0 templates let invoices carry the code with no ledger impact.
     case 'EE0':
-    case 'ZERO_EU_B2B':
     case 'ZERO_EU_GOODS':
     case 'ZERO_EU_SERVICES':
     case 'ZERO_EU_TRIANGLE':
     case 'ZERO_EXPORT':
     case 'EXEMPT':
+      return {
+        outputAccount: '2310 - Output VAT',
+        inputAccount: '2311 - Input VAT',
+      };
+    case 'ZERO_EU_B2B':
     // No standard Tax template: margin (KMS §41/§42) taxes only the margin;
     // OSS (§43) and EU establishment use a foreign rate + separate accounts.
     case 'MARGIN_24':

@@ -36,6 +36,13 @@
       "section": "Billing"
     },
     {
+      "fieldname": "registryCode",
+      "label": "Registry Code",
+      "fieldtype": "Data",
+      "placeholder": "12345678",
+      "section": "Billing"
+    },
+    {
       "fieldname": "vatNumber",
       "label": "VAT Number",
       "fieldtype": "Data",
@@ -58,6 +65,7 @@
     "currency",
     "role",
     "partyVatType",
+    "registryCode",
     "vatNumber",
     "iban"
   ],

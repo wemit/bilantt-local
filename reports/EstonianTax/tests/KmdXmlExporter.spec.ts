@@ -115,6 +115,55 @@ test('xml: saleLine emits all populated fields', (t) => {
   t.end();
 });
 
+test('xml: populated annexes clear their noSales/noPurchases flags', (t) => {
+  const d = baseData();
+  d.saleAnnex.push({
+    buyerRegCode: '10000001',
+    buyerName: 'Test OÜ',
+    invoiceNumber: 'INV-002',
+    invoiceDate: '2026-05-20',
+    invoiceSum: 1200,
+    taxRate: '24',
+    sumForRateInPeriod: 1000,
+    comments: '03',
+  });
+  d.purchaseAnnex.push({
+    sellerRegCode: '20000002',
+    sellerName: 'Supplier OÜ',
+    invoiceNumber: 'BILL-001',
+    invoiceDate: '2026-05-10',
+    invoiceSumVat: 1240,
+    vatInPeriod: 240,
+  });
+  const xml = exportKmdXml(d);
+
+  const salesAnnexAt = xml.indexOf('<salesAnnex>');
+  const purchasesAnnexAt = xml.indexOf('<purchasesAnnex>');
+  t.notEqual(
+    xml.indexOf('<noSales>false</noSales>', salesAnnexAt),
+    -1,
+    'salesAnnex no longer emits noSales true'
+  );
+  t.notEqual(
+    xml.indexOf('<noPurchases>false</noPurchases>', purchasesAnnexAt),
+    -1,
+    'purchasesAnnex no longer emits noPurchases true'
+  );
+
+  const taxRateAt = xml.indexOf('<taxRate>24</taxRate>');
+  const sumForRateAt = xml.indexOf(
+    '<sumForRateInPeriod>1000.00</sumForRateInPeriod>'
+  );
+  const commentsAt = xml.indexOf('<comments>03</comments>');
+  t.notEqual(sumForRateAt, -1, 'cell 9 emitted');
+  t.notEqual(commentsAt, -1, 'erisus code emitted');
+  t.ok(
+    taxRateAt < sumForRateAt && sumForRateAt < commentsAt,
+    'saleLine fields follow XSD order'
+  );
+  t.end();
+});
+
 test('xml: purchaseLine emits invoiceSumVat + vatInPeriod', (t) => {
   const d = baseData();
   d.purchaseAnnex.push({

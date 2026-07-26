@@ -115,6 +115,14 @@ function buildSalesAnnex(data: KmdReportData): OrderedNode[] {
     if (line.invoiceDate) lineNodes.push(text('invoiceDate', line.invoiceDate));
     lineNodes.push(text('invoiceSum', money(line.invoiceSum)));
     lineNodes.push(text('taxRate', line.taxRate));
+    if (line.sumForRateInPeriod !== undefined) {
+      lineNodes.push(
+        text('sumForRateInPeriod', money(line.sumForRateInPeriod))
+      );
+    }
+    if (line.comments) {
+      lineNodes.push(text('comments', line.comments));
+    }
     nodes.push({ saleLine: lineNodes });
   }
   return nodes;

@@ -38,6 +38,10 @@ invoiceDate?: string;
 invoiceSum: number;
 
 taxRate: string;
+
+sumForRateInPeriod?: number;
+
+comments?: string;
 }
 
 export interface PurchaseAnnexLine {
