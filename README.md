@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> **Frappe Books is currently blocked from releasing new updates due to a lack of support from Frappe in renewing essential code-signing certificates.** [Read more](https://github.com/flathub/io.frappe.books/issues/16#issuecomment-4638748707)
+
 <div align="center" markdown="1">
 <br/>
 
