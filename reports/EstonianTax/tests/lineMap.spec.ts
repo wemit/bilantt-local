@@ -1,6 +1,11 @@
 import test from 'tape';
 import { VAT_CODES } from '../../../regional/ee';
-import { emptyKmdBody, pickVersion, VAT_CODE_TO_BUCKET } from '../lineMap';
+import {
+  emptyKmdBody,
+  jeNet,
+  pickVersion,
+  VAT_CODE_TO_BUCKET,
+} from '../lineMap';
 
 // EE: off-KMD codes map to null — OSS files separately, PE supply taxed abroad
 const OFF_KMD = new Set(['OSS_SALES', 'EU_FIXED_ESTAB']);
@@ -74,19 +79,19 @@ test('lineMap: ZERO_EXPORT feeds line 3 + 3.2', (t) => {
   t.end();
 });
 
-test('lineMap: EU_RC_GOODS feeds line 6 + 6.1', (t) => {
+test('lineMap: EU_RC_GOODS feeds line 6 + 6.1 + 1', (t) => {
   const b = VAT_CODE_TO_BUCKET.EU_RC_GOODS!;
   t.equal(b.primary, 'euAcquisitionsGoodsAndServicesTotal');
-  t.deepEqual(b.also, ['euAcquisitionsGoods']);
+  t.deepEqual(b.also, ['euAcquisitionsGoods', 'transactions24']);
   t.equal(b.side, 'rc-purchase');
   t.equal(b.rate, 24);
   t.end();
 });
 
-test('lineMap: NON_EU_RC feeds line 7 only', (t) => {
+test('lineMap: NON_EU_RC feeds line 7 + 1', (t) => {
   const b = VAT_CODE_TO_BUCKET.NON_EU_RC!;
   t.equal(b.primary, 'acquisitionOtherGoodsAndServicesTotal');
-  t.notOk(b.also);
+  t.deepEqual(b.also, ['transactions24']);
   t.end();
 });
 
@@ -105,5 +110,32 @@ test('emptyKmdBody: all fields start at 0', (t) => {
   for (const k of Object.keys(b)) {
     t.equal(b[k as keyof typeof b], 0, `${k} starts at 0`);
   }
+  t.end();
+});
+
+test('jeNet: sales-side code counts income rows only; purchases count the rest', (t) => {
+  const liquid = new Set(['Bank']);
+  const income = new Set(['3025 - Service Exports']);
+  const fee = [
+    { account: '4340 - Banking Services', debit: '0.22' },
+    { account: 'Bank', credit: '0.22' },
+  ];
+  const payout = [
+    { account: 'Bank', debit: '100' },
+    { account: '3025 - Service Exports', credit: '100' },
+  ];
+  const refund = [
+    { account: '3025 - Service Exports', debit: '30' },
+    { account: 'Bank', credit: '30' },
+  ];
+  const saas = [
+    { account: '4320 - IT Services', debit: '90' },
+    { account: 'Bank', credit: '90' },
+  ];
+
+  t.equal(jeNet(fee, 'sales', liquid, income), 0, 'EXEMPT bank fee off line 8');
+  t.equal(jeNet(payout, 'sales', liquid, income), 100);
+  t.equal(jeNet(refund, 'sales', liquid, income), -30, 'refund reduces supply');
+  t.equal(jeNet(saas, 'rc-purchase', liquid, income), 90);
   t.end();
 });

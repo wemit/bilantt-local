@@ -25,7 +25,6 @@ export interface KmdBodyTotals {
   supplySpecialArrangements: number;
   adjustmentsPlus: number;
   adjustmentsMinus: number;
-  rcVatPayable: number;
 }
 
 export interface SaleAnnexLine {

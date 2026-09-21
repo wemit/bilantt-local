@@ -59,15 +59,14 @@ test('xml: zero monetary values are omitted', (t) => {
   t.end();
 });
 
-test('xml: noSales/noPurchases flags reflect body totals', (t) => {
+test('xml: RC-only body keeps noSales/noPurchases true (empty INF annexes)', (t) => {
   const d = baseData();
-  let xml = exportKmdXml(d);
-  t.ok(xml.includes('<noSales>true</noSales>'));
-  t.ok(xml.includes('<noPurchases>true</noPurchases>'));
-
-  d.body.transactions24 = 500;
-  xml = exportKmdXml(d);
-  t.ok(xml.includes('<noSales>false</noSales>'));
+  d.body.transactions24 = 111.67;
+  d.body.inputVatTotal = 26.8;
+  d.body.acquisitionOtherGoodsAndServicesTotal = 111.67;
+  const xml = exportKmdXml(d);
+  t.notOk(xml.includes('<noSales>false</noSales>'));
+  t.notOk(xml.includes('<noPurchases>false</noPurchases>'));
   t.end();
 });
 

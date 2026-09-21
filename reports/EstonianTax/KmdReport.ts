@@ -6,7 +6,12 @@ import { VatCodeName } from 'regional/ee';
 import { Report } from 'reports/Report';
 import { ColumnField, ReportData, ReportRow } from 'reports/types';
 import { Field } from 'schemas/types';
-import { emptyKmdBody, pickVersion, VAT_CODE_TO_BUCKET } from './lineMap';
+import {
+  emptyKmdBody,
+  jeNet,
+  pickVersion,
+  VAT_CODE_TO_BUCKET,
+} from './lineMap';
 import {
   buildPurchaseAnnex,
   buildSaleAnnex,
@@ -125,6 +130,11 @@ export class KmdReport extends Report {
       filters: { accountType: ['in', ['Bank', 'Cash']] },
     })) as Array<{ name: string }>;
     const liquidAccountNames = new Set(liquidAccounts.map((a) => a.name));
+    const incomeAccounts = (await this.fyo.db.getAllRaw('Account', {
+      fields: ['name'],
+      filters: { rootType: 'Income' },
+    })) as Array<{ name: string }>;
+    const incomeAccountNames = new Set(incomeAccounts.map((a) => a.name));
 
     const jeRows = (await this.fyo.db.getAllRaw(ModelNameEnum.JournalEntry, {
       fields: [
@@ -173,17 +183,18 @@ export class KmdReport extends Report {
         const rcReceivable = accountRows.find(
           (r) => r.account === '2314 - RC VAT Receivable'
         );
-        const rcPayable = accountRows.find(
-          (r) => r.account === '2314 - RC VAT Payable'
-        );
         body.inputVatTotal = round2(
           body.inputVatTotal + num(rcReceivable?.debit)
         );
-        body.rcVatPayable = round2(body.rcVatPayable + num(rcPayable?.credit));
         continue;
       }
 
-      const net = computeNonBankNet(accountRows, liquidAccountNames);
+      const net = jeNet(
+        accountRows,
+        bucket.side,
+        liquidAccountNames,
+        incomeAccountNames
+      );
       if (net === 0) continue;
 
       if (bucket.primary) {
@@ -405,7 +416,6 @@ export class KmdReport extends Report {
           // KMS § 3 lg 4: self-assessed RC VAT is both payable and deductible.
           const vat = round2((net * bucket.rate) / 100);
           body.inputVatTotal = round2(body.inputVatTotal + vat);
-          body.rcVatPayable = round2(body.rcVatPayable + vat);
         } else if (bucket.side === 'sales' && bucket.rate > 0) {
           // EE24/13/9 on a purchase invoice = domestic input VAT (KMD line 5).
           const vat = (net * bucket.rate) / 100;
@@ -446,7 +456,6 @@ export class KmdReport extends Report {
     );
     const vatBalance = round2(
       line4 +
-        body.rcVatPayable +
         body.importVat -
         body.inputVatTotal +
         body.adjustmentsPlus -
@@ -730,18 +739,6 @@ function num(s: string | undefined): number {
   if (!s) return 0;
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
-}
-
-function computeNonBankNet(
-  rows: Array<{ account: string; debit?: string; credit?: string }>,
-  liquidAccounts: Set<string>
-): number {
-  let net = 0;
-  for (const r of rows) {
-    if (liquidAccounts.has(r.account)) continue;
-    net += num(r.debit) + num(r.credit);
-  }
-  return round2(net);
 }
 
 function round2(n: number): number {

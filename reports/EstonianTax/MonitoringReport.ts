@@ -6,7 +6,7 @@ import { VatCodeName, VAT_CODES } from 'regional/ee';
 import { Report } from 'reports/Report';
 import { ColumnField, ReportCell, ReportData, ReportRow } from 'reports/types';
 import { Field, SelectOption } from 'schemas/types';
-import { VAT_CODE_TO_BUCKET } from './lineMap';
+import { jeNet, VAT_CODE_TO_BUCKET } from './lineMap';
 import { KmdBodyTotals } from './types';
 
 export const VD_ONLY_LINE = 'VD only';
@@ -292,6 +292,11 @@ export class KmdMonitoringReport extends Report {
       filters: { accountType: ['in', ['Bank', 'Cash']] },
     })) as Array<{ name: string }>;
     const liquidAccountNames = new Set(liquidAccounts.map((a) => a.name));
+    const incomeAccounts = (await this.fyo.db.getAllRaw('Account', {
+      fields: ['name'],
+      filters: { rootType: 'Income' },
+    })) as Array<{ name: string }>;
+    const incomeAccountNames = new Set(incomeAccounts.map((a) => a.name));
 
     const jeRows = (await this.fyo.db.getAllRaw(ModelNameEnum.JournalEntry, {
       fields: ['name', 'date', 'vatCode', 'archivalId', 'counterparty'],
@@ -328,16 +333,15 @@ export class KmdMonitoringReport extends Report {
         }
       )) as Array<{ account: string; debit?: string; credit?: string }>;
 
-      let net = 0;
-      for (const row of accountRows) {
-        if (liquidAccountNames.has(row.account)) {
-          continue;
-        }
-
-        net += num(row.debit) + num(row.credit);
-      }
-
-      net = round2(net);
+      const bucket = VAT_CODE_TO_BUCKET[vatCode as VatCodeName];
+      const net = bucket
+        ? jeNet(
+            accountRows,
+            bucket.side,
+            liquidAccountNames,
+            incomeAccountNames
+          )
+        : 0;
       if (net === 0) {
         continue;
       }

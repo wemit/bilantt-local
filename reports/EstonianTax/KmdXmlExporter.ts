@@ -1,5 +1,5 @@
 import { XMLBuilder } from 'fast-xml-parser';
-import { KmdBodyTotals, KmdReportData } from './types';
+import { KmdReportData } from './types';
 
 type OrderedNode = Record<string, OrderedNode[]> | { '#text': string };
 
@@ -34,16 +34,17 @@ function buildVatDeclaration(data: KmdReportData): OrderedNode[] {
     text('month', pad2(data.month)),
     text('declarationType', String(data.declarationType)),
     text('version', data.version),
-    { declarationBody: buildDeclarationBody(data.body) },
+    { declarationBody: buildDeclarationBody(data) },
     { salesAnnex: buildSalesAnnex(data) },
     { purchasesAnnex: buildPurchasesAnnex(data) },
   ];
 }
 
-function buildDeclarationBody(b: KmdBodyTotals): OrderedNode[] {
+function buildDeclarationBody(data: KmdReportData): OrderedNode[] {
+  const b = data.body;
   const nodes: OrderedNode[] = [
-    text('noSales', allZero(salesValues(b)) ? 'true' : 'false'),
-    text('noPurchases', allZero(purchaseValues(b)) ? 'true' : 'false'),
+    text('noSales', data.saleAnnex.length === 0 ? 'true' : 'false'),
+    text('noPurchases', data.purchaseAnnex.length === 0 ? 'true' : 'false'),
     text('sumPerPartnerSales', 'false'),
     text('sumPerPartnerPurchases', 'false'),
   ];
@@ -163,36 +164,4 @@ function money(n: number): string {
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
-}
-
-function salesValues(b: KmdBodyTotals): number[] {
-  return [
-    b.transactions24,
-    b.transactions22,
-    b.transactions20,
-    b.transactions9,
-    b.transactions5,
-    b.transactions13,
-    b.transactionsZeroVat,
-    b.salePassengersWithReturnVat,
-    b.supplyExemptFromTax,
-    b.supplySpecialArrangements,
-  ];
-}
-
-function purchaseValues(b: KmdBodyTotals): number[] {
-  return [
-    b.inputVatTotal,
-    b.importVat,
-    b.fixedAssetsVat,
-    b.carsVat,
-    b.carsPartialVat,
-    b.euAcquisitionsGoodsAndServicesTotal,
-    b.acquisitionOtherGoodsAndServicesTotal,
-    b.acquisitionImmovablesAndScrapMetalAndGold,
-  ];
-}
-
-function allZero(values: number[]): boolean {
-  return values.every((v) => v === 0);
 }
