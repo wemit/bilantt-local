@@ -311,6 +311,8 @@ export function getLedgerLink(
     name: 'Report',
     params: {
       reportClassName,
+    },
+    query: {
       defaultFilters: JSON.stringify({
         referenceType: doc.schemaName,
         referenceName: doc.name,
@@ -511,6 +513,11 @@ function getSubmittableDocStatus(doc: RenderData | Doc) {
     }
   }
 
+  /**
+   * SalesQuote extends Invoice but should never show payment-related
+   * statuses (Paid, Unpaid, etc.) since quotes cannot be paid.
+   * Return early with simple submitted/cancelled/saved statuses.
+   */
   if (!!doc.submitted && !doc.cancelled) {
     return 'Submitted';
   }
@@ -542,7 +549,7 @@ export function getInvoiceStatus(doc: RenderData | Doc): InvoiceStatus {
   if (
     doc.submitted &&
     !doc.cancelled &&
-    (doc.outstandingAmount as Money).eq(doc.grandTotal as Money)
+    (doc.outstandingAmount as Money).eq(doc.baseGrandTotal as Money)
   ) {
     return 'Unpaid';
   }
@@ -555,7 +562,7 @@ export function getInvoiceStatus(doc: RenderData | Doc): InvoiceStatus {
     doc.submitted &&
     !doc.isCancelled &&
     (doc.outstandingAmount as Money).isPositive() &&
-    (doc.outstandingAmount as Money).neq(doc.grandTotal as Money)
+    (doc.outstandingAmount as Money).neq(doc.baseGrandTotal as Money)
   ) {
     return 'PartlyPaid';
   }
